@@ -11,6 +11,10 @@ public class Bullet {
     private boolean active = true;
 
     public Bullet(float x, float y, float dirX, float dirY) {
+        this(x, y, dirX, dirY, 25);
+    }
+
+    public Bullet(float x, float y, float dirX, float dirY, int damage) {
         this.bounds = new Rectangle(x, y, 8, 8);
         this.direction = new Vector2(dirX, dirY);
 
@@ -21,7 +25,7 @@ public class Bullet {
         }
 
         this.speed = 450f;
-        this.damage = 25;
+        this.damage = damage;
     }
 
     public void update(float delta) {
