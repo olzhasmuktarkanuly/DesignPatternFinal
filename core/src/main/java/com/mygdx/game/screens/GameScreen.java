@@ -24,7 +24,9 @@ import com.mygdx.game.entities.Weapon;
 import com.mygdx.game.world.LevelData;
 import com.mygdx.game.world.LevelManager;
 import com.mygdx.game.world.ZombieSpawner;
-
+import com.mygdx.game.items.ItemFactory;
+import com.mygdx.game.items.Pickup;
+import com.mygdx.game.items.PickupType;
 
 public class GameScreen extends ScreenAdapter {
 
@@ -215,7 +217,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void addPickup(PickupType type, float x, float y) {
-        pickups.add(new Pickup(type, x, y));
+        pickups.add(ItemFactory.createPickup(type, x, y));
     }
 
     @Override
@@ -1138,21 +1140,6 @@ public class GameScreen extends ScreenAdapter {
             pickup.bounds.height
         );
     }
-    private boolean isPlayerNearPickup(Pickup pickup) {
-        float playerCenterX = player.getCenterX();
-        float playerCenterY = player.getCenterY();
-
-        float pickupCenterX = pickup.bounds.x + pickup.bounds.width / 2f;
-        float pickupCenterY = pickup.bounds.y + pickup.bounds.height / 2f;
-
-        float dx = playerCenterX - pickupCenterX;
-        float dy = playerCenterY - pickupCenterY;
-
-        float distanceSquared = dx * dx + dy * dy;
-
-        return distanceSquared < 2500f;
-    }
-
     private String getPickupLabel(PickupType type) {
         switch (type) {
             case PRIMARY_AK47:
@@ -1215,7 +1202,7 @@ public class GameScreen extends ScreenAdapter {
 
         font.draw(batch, "HP: " + player.getHp(), left, top);
         font.draw(batch, "Selected: " + selectedSlot, left, top - 25f);
-        font.draw(batch, "Current: " + getCurrentWeaponName(), left, top - 50f);
+        font.draw(batch, "Slot: " + selectedSlot, left, top - 50f);
         font.draw(batch, "Primary: " + getPrimaryWeaponName() + " Ammo: " + primaryAmmo, left, top - 75f);
         font.draw(batch, "Pistol: " + getPistolWeaponName() + " Ammo: " + pistolAmmo, left, top - 100f);
         font.draw(batch, "Melee: " + meleeWeaponName, left, top - 125f);
@@ -1232,6 +1219,9 @@ public class GameScreen extends ScreenAdapter {
         }
 
         font.draw(batch, "Wheel Switch | E Pickup | LMB Push | RMB Use", left, top - 300f);
+        if (selectedSlot == HandSlot.MEDKIT && hasMedkit && healUseTimer > 0f) {
+            font.draw(batch, "Healing: " + (int) healUseTimer + " / " + (int) MEDKIT_USE_TIME, left, top - 325f);
+        }
 
         if (player.isDead()) {
             font.draw(
@@ -1251,15 +1241,6 @@ public class GameScreen extends ScreenAdapter {
             );
         }
     }
-
-    private String getCurrentWeaponName() {
-        if (currentWeapon == null) {
-            return "None";
-        }
-
-        return currentWeapon.getName();
-    }
-
     private String getPrimaryWeaponName() {
         if (primaryWeapon == null) {
             return "None";
@@ -1275,38 +1256,30 @@ public class GameScreen extends ScreenAdapter {
 
         return pistolWeapon.getName();
     }
-
+    private String getSelectedItemName() {
+        switch (selectedSlot) {
+            case PRIMARY:
+                return getPrimaryWeaponName();
+            case PISTOL:
+                return getPistolWeaponName();
+            case MELEE:
+                return meleeWeaponName;
+            case THROWABLE:
+                return throwableName;
+            case MEDKIT:
+                return hasMedkit ? "Medkit" : "None";
+            case BOOST:
+                return boostItemName;
+            case NONE:
+            default:
+                return "None";
+        }
+    }
     @Override
     public void dispose() {
         Gdx.input.setInputProcessor(null);
         batch.dispose();
         font.dispose();
-    }
-
-    private enum PickupType {
-        PRIMARY_AK47,
-        PRIMARY_SNIPER,
-        PISTOL,
-        PRIMARY_AMMO,
-        PISTOL_AMMO,
-        BAT,
-        KATANA,
-        SHOVEL,
-        MEDKIT,
-        PILLS,
-        ADRENALINE,
-        BOMB,
-        MOLOTOV
-    }
-
-    private static class Pickup {
-        private final PickupType type;
-        private final Rectangle bounds;
-
-        private Pickup(PickupType type, float x, float y) {
-            this.type = type;
-            this.bounds = new Rectangle(x, y, 28, 28);
-        }
     }
     private enum HandSlot {
         NONE,

@@ -1,7 +1,5 @@
 package com.mygdx.game.entities;
-
 import com.badlogic.gdx.utils.Array;
-
 public class Pistol implements Weapon {
 
     @Override
