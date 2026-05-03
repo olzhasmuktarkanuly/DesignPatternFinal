@@ -2,6 +2,7 @@ package com.mygdx.game.screens;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -24,11 +25,16 @@ import com.mygdx.game.world.LevelData;
 import com.mygdx.game.world.LevelManager;
 import com.mygdx.game.world.ZombieSpawner;
 
+
 public class GameScreen extends ScreenAdapter {
 
     public static final float WORLD_WIDTH = 2000f;
     public static final float WORLD_HEIGHT = 2000f;
     private static final int TILE_SIZE = 32;
+    private static final float MEDKIT_USE_TIME = 3f;
+    private static final float PUSH_COOLDOWN = 0.45f;
+    private static final float PUSH_RANGE = 65f;
+    private static final float PUSH_DISTANCE = 45f;
 
     private final MainGame game;
     private final ZombieSpawner zombieSpawner = new ZombieSpawner();
@@ -51,6 +57,11 @@ public class GameScreen extends ScreenAdapter {
     private boolean victory = false;
 
     private float shootTimer = 0f;
+    private float healUseTimer = 0f;
+    private float pushTimer = 0f;
+    private float meleeTimer = 0f;
+
+    private HandSlot selectedSlot = HandSlot.NONE;
 
     private Weapon primaryWeapon = null;
     private Weapon pistolWeapon = null;
@@ -84,6 +95,18 @@ public class GameScreen extends ScreenAdapter {
 
         resetInventory();
         loadLevel(levelIndex);
+        Gdx.input.setInputProcessor(new InputAdapter() {
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                if (amountY > 0) {
+                    selectNextSlot();
+                } else if (amountY < 0) {
+                    selectPreviousSlot();
+                }
+
+                return true;
+            }
+        });
     }
 
     private void resetInventory() {
@@ -100,6 +123,12 @@ public class GameScreen extends ScreenAdapter {
         boostItemName = "None";
         throwableName = "None";
         throwableCount = 0;
+        selectedSlot = HandSlot.NONE;
+
+        shootTimer = 0f;
+        healUseTimer = 0f;
+        pushTimer = 0f;
+        meleeTimer = 0f;
     }
 
     private void loadLevel(int index) {
@@ -231,13 +260,12 @@ public class GameScreen extends ScreenAdapter {
         }
 
         shootTimer -= delta;
+        pushTimer -= delta;
+        meleeTimer -= delta;
 
         handlePlayerInput(delta);
         keepPlayerInsideWorld();
-
-        handleWeaponSwitching();
-        handleShooting();
-        handleInventoryUse();
+        handleMouseControls(delta);
 
         updatePickups();
 
@@ -249,6 +277,239 @@ public class GameScreen extends ScreenAdapter {
         checkExitZone();
         centerCameraOnPlayer();
     }
+        private void handleMouseControls   (float delta) {
+            if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+                pushZombies();
+            }
+
+            if (selectedSlot == HandSlot.PRIMARY || selectedSlot == HandSlot.PISTOL) {
+                handleGunShooting();
+                healUseTimer = 0f;
+                return;
+            }
+
+            if (selectedSlot == HandSlot.MELEE) {
+                handleMeleeAttack();
+                healUseTimer = 0f;
+                return;
+            }
+
+            if (selectedSlot == HandSlot.THROWABLE) {
+                handleThrowableUse();
+                healUseTimer = 0f;
+                return;
+            }
+
+            if (selectedSlot == HandSlot.MEDKIT) {
+                handleMedkitUse(delta);
+                return;
+            }
+
+            if (selectedSlot == HandSlot.BOOST) {
+                handleBoostUse();
+                healUseTimer = 0f;
+                return;
+            }
+
+            healUseTimer = 0f;
+        }
+
+        private void handleGunShooting() {
+            if (currentWeapon == null) {
+                return;
+            }
+
+            if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT)
+                && shootTimer <= 0f
+                && getCurrentAmmo() >= currentWeapon.getAmmoPerShot()) {
+
+                shootTimer = currentWeapon.getCooldown();
+                spendCurrentAmmo(currentWeapon.getAmmoPerShot());
+
+                Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+                camera.unproject(mouse);
+
+                float dirX = mouse.x - player.getCenterX();
+                float dirY = mouse.y - player.getCenterY();
+
+                currentWeapon.shoot(
+                    player.getCenterX(),
+                    player.getCenterY(),
+                    dirX,
+                    dirY,
+                    bullets
+                );
+            }
+        }
+
+        private void pushZombies() {
+            if (pushTimer > 0f) {
+                return;
+            }
+
+            pushTimer = PUSH_COOLDOWN;
+
+            float px = player.getCenterX();
+            float py = player.getCenterY();
+
+            for (Enemy enemy : enemies) {
+                Rectangle e = enemy.getBounds();
+
+                float ex = e.x + e.width / 2f;
+                float ey = e.y + e.height / 2f;
+
+                float dx = ex - px;
+                float dy = ey - py;
+                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > 0f && distance <= PUSH_RANGE) {
+                    dx /= distance;
+                    dy /= distance;
+
+                    e.x += dx * PUSH_DISTANCE;
+                    e.y += dy * PUSH_DISTANCE;
+                }
+            }
+        }
+
+        private void handleMeleeAttack() {
+            if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+                return;
+            }
+
+            if (meleeTimer > 0f || meleeWeaponName.equals("None")) {
+                return;
+            }
+
+            int damage = getMeleeDamage();
+            float range = getMeleeRange();
+
+            meleeTimer = getMeleeCooldown();
+
+            float px = player.getCenterX();
+            float py = player.getCenterY();
+
+            for (Enemy enemy : enemies) {
+                Rectangle e = enemy.getBounds();
+
+                float ex = e.x + e.width / 2f;
+                float ey = e.y + e.height / 2f;
+
+                float dx = ex - px;
+                float dy = ey - py;
+                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= range) {
+                    enemy.takeDamage(damage);
+                }
+            }
+        }
+
+        private int getMeleeDamage() {
+            if (meleeWeaponName.equals("Katana")) {
+                return 45;
+            }
+
+            if (meleeWeaponName.equals("Shovel")) {
+                return 55;
+            }
+
+            if (meleeWeaponName.equals("Bat")) {
+                return 30;
+            }
+
+            return 0;
+        }
+
+        private float getMeleeRange() {
+            if (meleeWeaponName.equals("Katana")) {
+                return 75f;
+            }
+
+            if (meleeWeaponName.equals("Shovel")) {
+                return 65f;
+            }
+
+            if (meleeWeaponName.equals("Bat")) {
+                return 60f;
+            }
+
+            return 0f;
+        }
+
+        private float getMeleeCooldown() {
+            if (meleeWeaponName.equals("Katana")) {
+                return 0.45f;
+            }
+
+            if (meleeWeaponName.equals("Shovel")) {
+                return 0.8f;
+            }
+
+            if (meleeWeaponName.equals("Bat")) {
+                return 0.55f;
+            }
+
+            return 0.5f;
+        }
+
+        private void handleThrowableUse() {
+            if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+                return;
+            }
+
+            if (throwableName.equals("None") || throwableCount <= 0) {
+                return;
+            }
+
+            throwableCount--;
+
+            if (throwableCount <= 0) {
+                throwableCount = 0;
+                throwableName = "None";
+                selectedSlot = HandSlot.NONE;
+            }
+        }
+
+        private void handleMedkitUse(float delta) {
+            if (!hasMedkit) {
+                selectedSlot = HandSlot.NONE;
+                healUseTimer = 0f;
+                return;
+            }
+
+            if (!Gdx.input.isButtonPressed(Input.Buttons.RIGHT)) {
+                healUseTimer = 0f;
+                return;
+            }
+
+            healUseTimer += delta;
+
+            if (healUseTimer >= MEDKIT_USE_TIME) {
+                player.takeDamage(-50);
+                hasMedkit = false;
+                healUseTimer = 0f;
+                selectedSlot = HandSlot.NONE;
+            }
+        }
+
+        private void handleBoostUse() {
+            if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+                return;
+            }
+
+            if (boostItemName.equals("Pills")) {
+                player.takeDamage(-25);
+                boostItemName = "None";
+                selectedSlot = HandSlot.NONE;
+            } else if (boostItemName.equals("Adrenaline")) {
+                player.takeDamage(-15);
+                boostItemName = "None";
+                selectedSlot = HandSlot.NONE;
+            }
+        }
+
+
 
     private void handlePlayerInput(float delta) {
         float oldX = player.getBounds().x;
@@ -278,45 +539,6 @@ public class GameScreen extends ScreenAdapter {
             }
         }
     }
-
-    private void handleWeaponSwitching() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1) && primaryWeapon != null) {
-            currentWeapon = primaryWeapon;
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2) && pistolWeapon != null) {
-            currentWeapon = pistolWeapon;
-        }
-    }
-
-    private void handleShooting() {
-        if (currentWeapon == null) {
-            return;
-        }
-
-        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)
-            && shootTimer <= 0f
-            && getCurrentAmmo() >= currentWeapon.getAmmoPerShot()) {
-
-            shootTimer = currentWeapon.getCooldown();
-            spendCurrentAmmo(currentWeapon.getAmmoPerShot());
-
-            Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-            camera.unproject(mouse);
-
-            float dirX = mouse.x - player.getCenterX();
-            float dirY = mouse.y - player.getCenterY();
-
-            currentWeapon.shoot(
-                player.getCenterX(),
-                player.getCenterY(),
-                dirX,
-                dirY,
-                bullets
-            );
-        }
-    }
-
     private int getCurrentAmmo() {
         if (currentWeapon == primaryWeapon) {
             return primaryAmmo;
@@ -342,38 +564,6 @@ public class GameScreen extends ScreenAdapter {
             }
         }
     }
-
-    private void handleInventoryUse() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.H) && hasMedkit) {
-            player.takeDamage(-50);
-            hasMedkit = false;
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.Q) && !boostItemName.equals("None")) {
-            if (boostItemName.equals("Pills")) {
-                player.takeDamage(-25);
-            }
-
-            if (boostItemName.equals("Adrenaline")) {
-                player.takeDamage(-15);
-            }
-
-            boostItemName = "None";
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F)
-            && !throwableName.equals("None")
-            && throwableCount > 0) {
-
-            throwableCount--;
-
-            if (throwableCount <= 0) {
-                throwableCount = 0;
-                throwableName = "None";
-            }
-        }
-    }
-
     private void updatePickups() {
         Pickup nearestPickup = getNearestPickupInRange();
 
@@ -391,20 +581,19 @@ public class GameScreen extends ScreenAdapter {
             case PRIMARY_AK47:
                 primaryWeapon = new AK47();
                 currentWeapon = primaryWeapon;
+                selectedSlot = HandSlot.PRIMARY;
                 return true;
 
             case PRIMARY_SNIPER:
                 primaryWeapon = new Sniper();
                 currentWeapon = primaryWeapon;
+                selectedSlot = HandSlot.PRIMARY;
                 return true;
 
             case PISTOL:
                 pistolWeapon = new Pistol();
-
-                if (currentWeapon == null) {
-                    currentWeapon = pistolWeapon;
-                }
-
+                currentWeapon = pistolWeapon;
+                selectedSlot = HandSlot.PISTOL;
                 return true;
 
             case PRIMARY_AMMO:
@@ -417,14 +606,20 @@ public class GameScreen extends ScreenAdapter {
 
             case BAT:
                 meleeWeaponName = "Bat";
+                currentWeapon = null;
+                selectedSlot = HandSlot.MELEE;
                 return true;
 
             case KATANA:
                 meleeWeaponName = "Katana";
+                currentWeapon = null;
+                selectedSlot = HandSlot.MELEE;
                 return true;
 
             case SHOVEL:
                 meleeWeaponName = "Shovel";
+                currentWeapon = null;
+                selectedSlot = HandSlot.MELEE;
                 return true;
 
             case MEDKIT:
@@ -433,28 +628,118 @@ public class GameScreen extends ScreenAdapter {
                 }
 
                 hasMedkit = true;
+                currentWeapon = null;
+                selectedSlot = HandSlot.MEDKIT;
                 return true;
+
 
             case PILLS:
                 boostItemName = "Pills";
+                currentWeapon = null;
+                selectedSlot = HandSlot.BOOST;
                 return true;
 
             case ADRENALINE:
                 boostItemName = "Adrenaline";
+                currentWeapon = null;
+                selectedSlot = HandSlot.BOOST;
                 return true;
 
             case BOMB:
                 throwableName = "Bomb";
                 throwableCount = 1;
+                currentWeapon = null;
+                selectedSlot = HandSlot.THROWABLE;
                 return true;
 
             case MOLOTOV:
                 throwableName = "Molotov";
                 throwableCount = 1;
+                currentWeapon = null;
+                selectedSlot = HandSlot.THROWABLE;
                 return true;
 
             default:
                 return false;
+        }
+    }
+    private void selectNextSlot() {
+        Array<HandSlot> slots = getAvailableSlots();
+
+        if (slots.size == 0) {
+            selectedSlot = HandSlot.NONE;
+            currentWeapon = null;
+            return;
+        }
+
+        int index = slots.indexOf(selectedSlot, true);
+
+        if (index == -1 || index == slots.size - 1) {
+            selectedSlot = slots.first();
+        } else {
+            selectedSlot = slots.get(index + 1);
+        }
+
+        applySelectedSlot();
+    }
+
+    private void selectPreviousSlot() {
+        Array<HandSlot> slots = getAvailableSlots();
+
+        if (slots.size == 0) {
+            selectedSlot = HandSlot.NONE;
+            currentWeapon = null;
+            return;
+        }
+
+        int index = slots.indexOf(selectedSlot, true);
+
+        if (index <= 0) {
+            selectedSlot = slots.get(slots.size - 1);
+        } else {
+            selectedSlot = slots.get(index - 1);
+        }
+
+        applySelectedSlot();
+    }
+
+    private Array<HandSlot> getAvailableSlots() {
+        Array<HandSlot> slots = new Array<>();
+
+        if (primaryWeapon != null) {
+            slots.add(HandSlot.PRIMARY);
+        }
+
+        if (pistolWeapon != null) {
+            slots.add(HandSlot.PISTOL);
+        }
+
+        if (!meleeWeaponName.equals("None")) {
+            slots.add(HandSlot.MELEE);
+        }
+
+        if (!throwableName.equals("None") && throwableCount > 0) {
+            slots.add(HandSlot.THROWABLE);
+        }
+
+        if (hasMedkit) {
+            slots.add(HandSlot.MEDKIT);
+        }
+
+        if (!boostItemName.equals("None")) {
+            slots.add(HandSlot.BOOST);
+        }
+
+        return slots;
+    }
+
+    private void applySelectedSlot() {
+        if (selectedSlot == HandSlot.PRIMARY) {
+            currentWeapon = primaryWeapon;
+        } else if (selectedSlot == HandSlot.PISTOL) {
+            currentWeapon = pistolWeapon;
+        } else {
+            currentWeapon = null;
         }
     }
 
@@ -548,7 +833,6 @@ public class GameScreen extends ScreenAdapter {
             }
         }
     }
-
     private void keepPlayerInsideWorld() {
         Rectangle b = player.getBounds();
 
@@ -618,8 +902,8 @@ public class GameScreen extends ScreenAdapter {
             font.setColor(Color.WHITE);
             font.draw(
                 batch,
-                "Press E: " + getPickupLabel(nearestPickup.type),
-                player.getBounds().x - 35,
+                getPickupLabel(nearestPickup.type),
+                player.getBounds().x - 20,
                 player.getBounds().y + player.getBounds().height + 35
             );
         }
@@ -757,25 +1041,24 @@ public class GameScreen extends ScreenAdapter {
         font.setColor(Color.WHITE);
 
         font.draw(batch, "HP: " + player.getHp(), left, top);
-        font.draw(batch, "Current: " + getCurrentWeaponName(), left, top - 25f);
-        font.draw(batch, "Primary: " + getPrimaryWeaponName() + " Ammo: " + primaryAmmo, left, top - 50f);
-        font.draw(batch, "Pistol: " + getPistolWeaponName() + " Ammo: " + pistolAmmo, left, top - 75f);
-        font.draw(batch, "Melee: " + meleeWeaponName, left, top - 100f);
-        font.draw(batch, "Medkit: " + (hasMedkit ? "1" : "0"), left, top - 125f);
-        font.draw(batch, "Boost: " + boostItemName, left, top - 150f);
-        font.draw(batch, "Throwable: " + throwableName + " x" + throwableCount, left, top - 175f);
-        font.draw(batch, "Kills: " + kills, left, top - 200f);
-        font.draw(batch, "Map: " + (victory ? "Completed" : (levelIndex + 1) + "/4"), left, top - 225f);
+        font.draw(batch, "Selected: " + selectedSlot, left, top - 25f);
+        font.draw(batch, "Current: " + getCurrentWeaponName(), left, top - 50f);
+        font.draw(batch, "Primary: " + getPrimaryWeaponName() + " Ammo: " + primaryAmmo, left, top - 75f);
+        font.draw(batch, "Pistol: " + getPistolWeaponName() + " Ammo: " + pistolAmmo, left, top - 100f);
+        font.draw(batch, "Melee: " + meleeWeaponName, left, top - 125f);
+        font.draw(batch, "Medkit: " + (hasMedkit ? "1" : "0"), left, top - 150f);
+        font.draw(batch, "Boost: " + boostItemName, left, top - 175f);
+        font.draw(batch, "Throwable: " + throwableName + " x" + throwableCount, left, top - 200f);
+        font.draw(batch, "Kills: " + kills, left, top - 225f);
+        font.draw(batch, "Map: " + (victory ? "Completed" : (levelIndex + 1) + "/4"), left, top - 250f);
 
-        if (player.getBounds().overlaps(startSafeZone)) {
-            font.draw(batch, "SAFE ZONE: Press E on items to pick them up", left, top - 250f);
-        } else if (player.getBounds().overlaps(exitZone)) {
-            font.draw(batch, "EXIT SAFE ZONE: Press E to continue", left, top - 250f);
+        if (player.getBounds().overlaps(exitZone)) {
+            font.draw(batch, "EXIT SAFE ZONE: Press E to continue", left, top - 275f);
         } else {
-            font.draw(batch, "Objective: Reach the next safe zone", left, top - 250f);
+            font.draw(batch, "Objective: Reach the next safe zone", left, top - 275f);
         }
 
-        font.draw(batch, "1 Primary | 2 Pistol | E Pickup | H Heal | Q Boost | F Throw", left, top - 275f);
+        font.draw(batch, "Wheel Switch | E Pickup | LMB Push | RMB Use", left, top - 300f);
 
         if (player.isDead()) {
             font.draw(
@@ -822,6 +1105,7 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void dispose() {
+        Gdx.input.setInputProcessor(null);
         batch.dispose();
         font.dispose();
     }
@@ -850,5 +1134,14 @@ public class GameScreen extends ScreenAdapter {
             this.type = type;
             this.bounds = new Rectangle(x, y, 28, 28);
         }
+    }
+    private enum HandSlot {
+        NONE,
+        PRIMARY,
+        PISTOL,
+        MELEE,
+        THROWABLE,
+        MEDKIT,
+        BOOST
     }
 }
