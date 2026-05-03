@@ -578,22 +578,50 @@ public class GameScreen extends ScreenAdapter {
 
     private boolean applyPickup(PickupType type) {
         switch (type) {
-            case PRIMARY_AK47:
-                primaryWeapon = new AK47();
-                currentWeapon = primaryWeapon;
-                selectedSlot = HandSlot.PRIMARY;
-                return true;
+            case PRIMARY_AK47: {
+                PickupType oldPrimary = getPrimaryPickupType();
 
-            case PRIMARY_SNIPER:
-                primaryWeapon = new Sniper();
-                currentWeapon = primaryWeapon;
+                if (oldPrimary == PickupType.PRIMARY_AK47) {
+                    return false;
+                }
+
+                primaryWeapon = new AK47();
                 selectedSlot = HandSlot.PRIMARY;
+                applySelectedSlot();
+
+                if (oldPrimary != null) {
+                    dropPickupNearPlayer(oldPrimary);
+                }
+
                 return true;
+            }
+
+            case PRIMARY_SNIPER: {
+                PickupType oldPrimary = getPrimaryPickupType();
+
+                if (oldPrimary == PickupType.PRIMARY_SNIPER) {
+                    return false;
+                }
+
+                primaryWeapon = new Sniper();
+                selectedSlot = HandSlot.PRIMARY;
+                applySelectedSlot();
+
+                if (oldPrimary != null) {
+                    dropPickupNearPlayer(oldPrimary);
+                }
+
+                return true;
+            }
 
             case PISTOL:
+                if (pistolWeapon != null) {
+                    return false;
+                }
+
                 pistolWeapon = new Pistol();
-                currentWeapon = pistolWeapon;
                 selectedSlot = HandSlot.PISTOL;
+                applySelectedSlot();
                 return true;
 
             case PRIMARY_AMMO:
@@ -604,23 +632,59 @@ public class GameScreen extends ScreenAdapter {
                 pistolAmmo += 20;
                 return true;
 
-            case BAT:
+            case BAT: {
+                PickupType oldMelee = getMeleePickupType();
+
+                if (oldMelee == PickupType.BAT) {
+                    return false;
+                }
+
                 meleeWeaponName = "Bat";
-                currentWeapon = null;
                 selectedSlot = HandSlot.MELEE;
-                return true;
+                applySelectedSlot();
 
-            case KATANA:
+                if (oldMelee != null) {
+                    dropPickupNearPlayer(oldMelee);
+                }
+
+                return true;
+            }
+
+            case KATANA: {
+                PickupType oldMelee = getMeleePickupType();
+
+                if (oldMelee == PickupType.KATANA) {
+                    return false;
+                }
+
                 meleeWeaponName = "Katana";
-                currentWeapon = null;
                 selectedSlot = HandSlot.MELEE;
-                return true;
+                applySelectedSlot();
 
-            case SHOVEL:
-                meleeWeaponName = "Shovel";
-                currentWeapon = null;
-                selectedSlot = HandSlot.MELEE;
+                if (oldMelee != null) {
+                    dropPickupNearPlayer(oldMelee);
+                }
+
                 return true;
+            }
+
+            case SHOVEL: {
+                PickupType oldMelee = getMeleePickupType();
+
+                if (oldMelee == PickupType.SHOVEL) {
+                    return false;
+                }
+
+                meleeWeaponName = "Shovel";
+                selectedSlot = HandSlot.MELEE;
+                applySelectedSlot();
+
+                if (oldMelee != null) {
+                    dropPickupNearPlayer(oldMelee);
+                }
+
+                return true;
+            }
 
             case MEDKIT:
                 if (hasMedkit) {
@@ -628,40 +692,149 @@ public class GameScreen extends ScreenAdapter {
                 }
 
                 hasMedkit = true;
-                currentWeapon = null;
                 selectedSlot = HandSlot.MEDKIT;
+                applySelectedSlot();
                 return true;
 
+            case PILLS: {
+                PickupType oldBoost = getBoostPickupType();
 
-            case PILLS:
+                if (oldBoost == PickupType.PILLS) {
+                    return false;
+                }
+
                 boostItemName = "Pills";
-                currentWeapon = null;
                 selectedSlot = HandSlot.BOOST;
-                return true;
+                applySelectedSlot();
 
-            case ADRENALINE:
+                if (oldBoost != null) {
+                    dropPickupNearPlayer(oldBoost);
+                }
+
+                return true;
+            }
+
+            case ADRENALINE: {
+                PickupType oldBoost = getBoostPickupType();
+
+                if (oldBoost == PickupType.ADRENALINE) {
+                    return false;
+                }
+
                 boostItemName = "Adrenaline";
-                currentWeapon = null;
                 selectedSlot = HandSlot.BOOST;
-                return true;
+                applySelectedSlot();
 
-            case BOMB:
+                if (oldBoost != null) {
+                    dropPickupNearPlayer(oldBoost);
+                }
+
+                return true;
+            }
+
+            case BOMB: {
+                PickupType oldThrowable = getThrowablePickupType();
+
+                if (oldThrowable == PickupType.BOMB) {
+                    return false;
+                }
+
                 throwableName = "Bomb";
                 throwableCount = 1;
-                currentWeapon = null;
                 selectedSlot = HandSlot.THROWABLE;
-                return true;
+                applySelectedSlot();
 
-            case MOLOTOV:
+                if (oldThrowable != null) {
+                    dropPickupNearPlayer(oldThrowable);
+                }
+
+                return true;
+            }
+
+            case MOLOTOV: {
+                PickupType oldThrowable = getThrowablePickupType();
+
+                if (oldThrowable == PickupType.MOLOTOV) {
+                    return false;
+                }
+
                 throwableName = "Molotov";
                 throwableCount = 1;
-                currentWeapon = null;
                 selectedSlot = HandSlot.THROWABLE;
+                applySelectedSlot();
+
+                if (oldThrowable != null) {
+                    dropPickupNearPlayer(oldThrowable);
+                }
+
                 return true;
+            }
 
             default:
                 return false;
         }
+    }
+    private void dropPickupNearPlayer(PickupType type) {
+        float dropX = player.getBounds().x + 45f;
+        float dropY = player.getBounds().y;
+
+        addPickup(type, dropX, dropY);
+    }
+
+    private PickupType getPrimaryPickupType() {
+        if (primaryWeapon == null) {
+            return null;
+        }
+
+        if (primaryWeapon.getName().equals("AK47")) {
+            return PickupType.PRIMARY_AK47;
+        }
+
+        if (primaryWeapon.getName().equals("Sniper")) {
+            return PickupType.PRIMARY_SNIPER;
+        }
+
+        return null;
+    }
+
+    private PickupType getMeleePickupType() {
+        if (meleeWeaponName.equals("Bat")) {
+            return PickupType.BAT;
+        }
+
+        if (meleeWeaponName.equals("Katana")) {
+            return PickupType.KATANA;
+        }
+
+        if (meleeWeaponName.equals("Shovel")) {
+            return PickupType.SHOVEL;
+        }
+
+        return null;
+    }
+
+    private PickupType getBoostPickupType() {
+        if (boostItemName.equals("Pills")) {
+            return PickupType.PILLS;
+        }
+
+        if (boostItemName.equals("Adrenaline")) {
+            return PickupType.ADRENALINE;
+        }
+
+        return null;
+    }
+
+    private PickupType getThrowablePickupType() {
+        if (throwableName.equals("Bomb")) {
+            return PickupType.BOMB;
+        }
+
+        if (throwableName.equals("Molotov")) {
+            return PickupType.MOLOTOV;
+        }
+
+        return null;
     }
     private void selectNextSlot() {
         Array<HandSlot> slots = getAvailableSlots();
