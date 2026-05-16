@@ -28,6 +28,7 @@ import com.mygdx.game.items.ItemFactory;
 import com.mygdx.game.items.Pickup;
 import com.mygdx.game.items.PickupType;
 import com.mygdx.game.inventory.HandSlot;
+import com.mygdx.game.inventory.Inventory;
 
 public class GameScreen extends ScreenAdapter {
 
@@ -64,21 +65,7 @@ public class GameScreen extends ScreenAdapter {
     private float pushTimer = 0f;
     private float meleeTimer = 0f;
 
-    private HandSlot selectedSlot = HandSlot.NONE;
-
-    private Weapon primaryWeapon = null;
-    private Weapon pistolWeapon = null;
-    private Weapon currentWeapon = null;
-
-    private int primaryAmmo = 0;
-    private int pistolAmmo = 0;
-
-    private String meleeWeaponName = "None";
-    private boolean hasMedkit = false;
-
-    private String boostItemName = "None";
-    private String throwableName = "None";
-    private int throwableCount = 0;
+    private final Inventory inventory = new Inventory();
 
     public GameScreen(MainGame game) {
         this.game = game;
@@ -113,20 +100,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void resetInventory() {
-        primaryWeapon = null;
-        pistolWeapon = null;
-        currentWeapon = null;
-
-        primaryAmmo = 0;
-        pistolAmmo = 0;
-
-        meleeWeaponName = "None";
-        hasMedkit = false;
-
-        boostItemName = "None";
-        throwableName = "None";
-        throwableCount = 0;
-        selectedSlot = HandSlot.NONE;
+        inventory.reset();
 
         shootTimer = 0f;
         healUseTimer = 0f;
@@ -285,6 +259,8 @@ public class GameScreen extends ScreenAdapter {
                 pushZombies();
             }
 
+            HandSlot selectedSlot = inventory.getSelectedSlot();
+
             if (selectedSlot == HandSlot.PRIMARY || selectedSlot == HandSlot.PISTOL) {
                 handleGunShooting();
                 healUseTimer = 0f;
@@ -318,16 +294,18 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private void handleGunShooting() {
+            Weapon currentWeapon = inventory.getCurrentWeapon();
+
             if (currentWeapon == null) {
                 return;
             }
 
             if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT)
                 && shootTimer <= 0f
-                && getCurrentAmmo() >= currentWeapon.getAmmoPerShot()) {
+                && inventory.getCurrentAmmo() >= currentWeapon.getAmmoPerShot()) {
 
                 shootTimer = currentWeapon.getCooldown();
-                spendCurrentAmmo(currentWeapon.getAmmoPerShot());
+                inventory.spendCurrentAmmo(currentWeapon.getAmmoPerShot());
 
                 Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
                 camera.unproject(mouse);
@@ -380,7 +358,7 @@ public class GameScreen extends ScreenAdapter {
                 return;
             }
 
-            if (meleeTimer > 0f || meleeWeaponName.equals("None")) {
+            if (meleeTimer > 0f || inventory.getMeleeWeaponName().equals("None")) {
                 return;
             }
 
@@ -409,6 +387,8 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private int getMeleeDamage() {
+            String meleeWeaponName = inventory.getMeleeWeaponName();
+
             if (meleeWeaponName.equals("Katana")) {
                 return 45;
             }
@@ -425,6 +405,7 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private float getMeleeRange() {
+            String meleeWeaponName = inventory.getMeleeWeaponName();
             if (meleeWeaponName.equals("Katana")) {
                 return 75f;
             }
@@ -441,7 +422,9 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private float getMeleeCooldown() {
-            if (meleeWeaponName.equals("Katana")) {
+        String meleeWeaponName = inventory.getMeleeWeaponName();
+
+        if (meleeWeaponName.equals("Katana")) {
                 return 0.45f;
             }
 
@@ -461,22 +444,15 @@ public class GameScreen extends ScreenAdapter {
                 return;
             }
 
-            if (throwableName.equals("None") || throwableCount <= 0) {
+            if (inventory.getThrowableName().equals("None") || inventory.getThrowableCount() <= 0) {
                 return;
             }
 
-            throwableCount--;
-
-            if (throwableCount <= 0) {
-                throwableCount = 0;
-                throwableName = "None";
-                selectedSlot = HandSlot.NONE;
-            }
+            inventory.consumeThrowable();
         }
 
         private void handleMedkitUse(float delta) {
-            if (!hasMedkit) {
-                selectedSlot = HandSlot.NONE;
+            if (!inventory.hasMedkit()) {
                 healUseTimer = 0f;
                 return;
             }
@@ -490,9 +466,8 @@ public class GameScreen extends ScreenAdapter {
 
             if (healUseTimer >= MEDKIT_USE_TIME) {
                 player.takeDamage(-50);
-                hasMedkit = false;
+                inventory.consumeMedkit();
                 healUseTimer = 0f;
-                selectedSlot = HandSlot.NONE;
             }
         }
 
@@ -501,14 +476,12 @@ public class GameScreen extends ScreenAdapter {
                 return;
             }
 
-            if (boostItemName.equals("Pills")) {
+            if (inventory.getBoostItemName().equals("Pills")) {
                 player.takeDamage(-25);
-                boostItemName = "None";
-                selectedSlot = HandSlot.NONE;
-            } else if (boostItemName.equals("Adrenaline")) {
+                inventory.consumeBoost();
+            } else if (inventory.getBoostItemName().equals("Adrenaline")) {
                 player.takeDamage(-15);
-                boostItemName = "None";
-                selectedSlot = HandSlot.NONE;
+                inventory.consumeBoost();
             }
         }
 
@@ -542,31 +515,7 @@ public class GameScreen extends ScreenAdapter {
             }
         }
     }
-    private int getCurrentAmmo() {
-        if (currentWeapon == primaryWeapon) {
-            return primaryAmmo;
-        }
 
-        if (currentWeapon == pistolWeapon) {
-            return pistolAmmo;
-        }
-
-        return 0;
-    }
-
-    private void spendCurrentAmmo(int amount) {
-        if (currentWeapon == primaryWeapon) {
-            primaryAmmo -= amount;
-            if (primaryAmmo < 0) {
-                primaryAmmo = 0;
-            }
-        } else if (currentWeapon == pistolWeapon) {
-            pistolAmmo -= amount;
-            if (pistolAmmo < 0) {
-                pistolAmmo = 0;
-            }
-        }
-    }
     private void updatePickups() {
         Pickup nearestPickup = getNearestPickupInRange();
 
@@ -580,202 +529,52 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private boolean applyPickup(PickupType type) {
+        PickupType oldPrimary = inventory.getPrimaryPickupType();
+        PickupType oldMelee = inventory.getMeleePickupType();
+        PickupType oldBoost = inventory.getBoostPickupType();
+        PickupType oldThrowable = inventory.getThrowablePickupType();
+
+        boolean pickedUp = inventory.pickUp(type);
+
+        if (!pickedUp) {
+            return false;
+        }
+
         switch (type) {
-            case PRIMARY_AK47: {
-                PickupType oldPrimary = getPrimaryPickupType();
-
-                if (oldPrimary == PickupType.PRIMARY_AK47) {
-                    return false;
-                }
-
-                primaryWeapon = new AK47();
-                selectedSlot = HandSlot.PRIMARY;
-                applySelectedSlot();
-
-                if (oldPrimary != null) {
+            case PRIMARY_AK47:
+            case PRIMARY_SNIPER:
+                if (oldPrimary != null && oldPrimary != type) {
                     dropPickupNearPlayer(oldPrimary);
                 }
+                break;
 
-                return true;
-            }
-
-            case PRIMARY_SNIPER: {
-                PickupType oldPrimary = getPrimaryPickupType();
-
-                if (oldPrimary == PickupType.PRIMARY_SNIPER) {
-                    return false;
-                }
-
-                primaryWeapon = new Sniper();
-                selectedSlot = HandSlot.PRIMARY;
-                applySelectedSlot();
-
-                if (oldPrimary != null) {
-                    dropPickupNearPlayer(oldPrimary);
-                }
-
-                return true;
-            }
-
-            case PISTOL:
-                if (pistolWeapon != null) {
-                    return false;
-                }
-
-                pistolWeapon = new Pistol();
-                selectedSlot = HandSlot.PISTOL;
-                applySelectedSlot();
-                return true;
-
-            case PRIMARY_AMMO:
-                primaryAmmo += 30;
-                return true;
-
-            case PISTOL_AMMO:
-                pistolAmmo += 20;
-                return true;
-
-            case BAT: {
-                PickupType oldMelee = getMeleePickupType();
-
-                if (oldMelee == PickupType.BAT) {
-                    return false;
-                }
-
-                meleeWeaponName = "Bat";
-                selectedSlot = HandSlot.MELEE;
-                applySelectedSlot();
-
-                if (oldMelee != null) {
+            case BAT:
+            case KATANA:
+            case SHOVEL:
+                if (oldMelee != null && oldMelee != type) {
                     dropPickupNearPlayer(oldMelee);
                 }
+                break;
 
-                return true;
-            }
-
-            case KATANA: {
-                PickupType oldMelee = getMeleePickupType();
-
-                if (oldMelee == PickupType.KATANA) {
-                    return false;
-                }
-
-                meleeWeaponName = "Katana";
-                selectedSlot = HandSlot.MELEE;
-                applySelectedSlot();
-
-                if (oldMelee != null) {
-                    dropPickupNearPlayer(oldMelee);
-                }
-
-                return true;
-            }
-
-            case SHOVEL: {
-                PickupType oldMelee = getMeleePickupType();
-
-                if (oldMelee == PickupType.SHOVEL) {
-                    return false;
-                }
-
-                meleeWeaponName = "Shovel";
-                selectedSlot = HandSlot.MELEE;
-                applySelectedSlot();
-
-                if (oldMelee != null) {
-                    dropPickupNearPlayer(oldMelee);
-                }
-
-                return true;
-            }
-
-            case MEDKIT:
-                if (hasMedkit) {
-                    return false;
-                }
-
-                hasMedkit = true;
-                selectedSlot = HandSlot.MEDKIT;
-                applySelectedSlot();
-                return true;
-
-            case PILLS: {
-                PickupType oldBoost = getBoostPickupType();
-
-                if (oldBoost == PickupType.PILLS) {
-                    return false;
-                }
-
-                boostItemName = "Pills";
-                selectedSlot = HandSlot.BOOST;
-                applySelectedSlot();
-
-                if (oldBoost != null) {
+            case PILLS:
+            case ADRENALINE:
+                if (oldBoost != null && oldBoost != type) {
                     dropPickupNearPlayer(oldBoost);
                 }
+                break;
 
-                return true;
-            }
-
-            case ADRENALINE: {
-                PickupType oldBoost = getBoostPickupType();
-
-                if (oldBoost == PickupType.ADRENALINE) {
-                    return false;
-                }
-
-                boostItemName = "Adrenaline";
-                selectedSlot = HandSlot.BOOST;
-                applySelectedSlot();
-
-                if (oldBoost != null) {
-                    dropPickupNearPlayer(oldBoost);
-                }
-
-                return true;
-            }
-
-            case BOMB: {
-                PickupType oldThrowable = getThrowablePickupType();
-
-                if (oldThrowable == PickupType.BOMB) {
-                    return false;
-                }
-
-                throwableName = "Bomb";
-                throwableCount = 1;
-                selectedSlot = HandSlot.THROWABLE;
-                applySelectedSlot();
-
-                if (oldThrowable != null) {
+            case BOMB:
+            case MOLOTOV:
+                if (oldThrowable != null && oldThrowable != type) {
                     dropPickupNearPlayer(oldThrowable);
                 }
-
-                return true;
-            }
-
-            case MOLOTOV: {
-                PickupType oldThrowable = getThrowablePickupType();
-
-                if (oldThrowable == PickupType.MOLOTOV) {
-                    return false;
-                }
-
-                throwableName = "Molotov";
-                throwableCount = 1;
-                selectedSlot = HandSlot.THROWABLE;
-                applySelectedSlot();
-
-                if (oldThrowable != null) {
-                    dropPickupNearPlayer(oldThrowable);
-                }
-
-                return true;
-            }
+                break;
 
             default:
-                return false;
+                break;
         }
+
+        return true;
     }
     private void dropPickupNearPlayer(PickupType type) {
         float dropX = player.getBounds().x + 45f;
@@ -784,139 +583,12 @@ public class GameScreen extends ScreenAdapter {
         addPickup(type, dropX, dropY);
     }
 
-    private PickupType getPrimaryPickupType() {
-        if (primaryWeapon == null) {
-            return null;
-        }
-
-        if (primaryWeapon.getName().equals("AK47")) {
-            return PickupType.PRIMARY_AK47;
-        }
-
-        if (primaryWeapon.getName().equals("Sniper")) {
-            return PickupType.PRIMARY_SNIPER;
-        }
-
-        return null;
-    }
-
-    private PickupType getMeleePickupType() {
-        if (meleeWeaponName.equals("Bat")) {
-            return PickupType.BAT;
-        }
-
-        if (meleeWeaponName.equals("Katana")) {
-            return PickupType.KATANA;
-        }
-
-        if (meleeWeaponName.equals("Shovel")) {
-            return PickupType.SHOVEL;
-        }
-
-        return null;
-    }
-
-    private PickupType getBoostPickupType() {
-        if (boostItemName.equals("Pills")) {
-            return PickupType.PILLS;
-        }
-
-        if (boostItemName.equals("Adrenaline")) {
-            return PickupType.ADRENALINE;
-        }
-
-        return null;
-    }
-
-    private PickupType getThrowablePickupType() {
-        if (throwableName.equals("Bomb")) {
-            return PickupType.BOMB;
-        }
-
-        if (throwableName.equals("Molotov")) {
-            return PickupType.MOLOTOV;
-        }
-
-        return null;
-    }
     private void selectNextSlot() {
-        Array<HandSlot> slots = getAvailableSlots();
-
-        if (slots.size == 0) {
-            selectedSlot = HandSlot.NONE;
-            currentWeapon = null;
-            return;
-        }
-
-        int index = slots.indexOf(selectedSlot, true);
-
-        if (index == -1 || index == slots.size - 1) {
-            selectedSlot = slots.first();
-        } else {
-            selectedSlot = slots.get(index + 1);
-        }
-
-        applySelectedSlot();
+        inventory.selectNextSlot();
     }
 
     private void selectPreviousSlot() {
-        Array<HandSlot> slots = getAvailableSlots();
-
-        if (slots.size == 0) {
-            selectedSlot = HandSlot.NONE;
-            currentWeapon = null;
-            return;
-        }
-
-        int index = slots.indexOf(selectedSlot, true);
-
-        if (index <= 0) {
-            selectedSlot = slots.get(slots.size - 1);
-        } else {
-            selectedSlot = slots.get(index - 1);
-        }
-
-        applySelectedSlot();
-    }
-
-    private Array<HandSlot> getAvailableSlots() {
-        Array<HandSlot> slots = new Array<>();
-
-        if (primaryWeapon != null) {
-            slots.add(HandSlot.PRIMARY);
-        }
-
-        if (pistolWeapon != null) {
-            slots.add(HandSlot.PISTOL);
-        }
-
-        if (!meleeWeaponName.equals("None")) {
-            slots.add(HandSlot.MELEE);
-        }
-
-        if (!throwableName.equals("None") && throwableCount > 0) {
-            slots.add(HandSlot.THROWABLE);
-        }
-
-        if (hasMedkit) {
-            slots.add(HandSlot.MEDKIT);
-        }
-
-        if (!boostItemName.equals("None")) {
-            slots.add(HandSlot.BOOST);
-        }
-
-        return slots;
-    }
-
-    private void applySelectedSlot() {
-        if (selectedSlot == HandSlot.PRIMARY) {
-            currentWeapon = primaryWeapon;
-        } else if (selectedSlot == HandSlot.PISTOL) {
-            currentWeapon = pistolWeapon;
-        } else {
-            currentWeapon = null;
-        }
+        inventory.selectPreviousSlot();
     }
 
     private void updateBullets(float delta) {
@@ -1202,14 +874,14 @@ public class GameScreen extends ScreenAdapter {
         font.setColor(Color.WHITE);
 
         font.draw(batch, "HP: " + player.getHp(), left, top);
-        font.draw(batch, "Selected: " + selectedSlot, left, top - 25f);
-        font.draw(batch, "Slot: " + selectedSlot, left, top - 50f);
-        font.draw(batch, "Primary: " + getPrimaryWeaponName() + " Ammo: " + primaryAmmo, left, top - 75f);
-        font.draw(batch, "Pistol: " + getPistolWeaponName() + " Ammo: " + pistolAmmo, left, top - 100f);
-        font.draw(batch, "Melee: " + meleeWeaponName, left, top - 125f);
-        font.draw(batch, "Medkit: " + (hasMedkit ? "1" : "0"), left, top - 150f);
-        font.draw(batch, "Boost: " + boostItemName, left, top - 175f);
-        font.draw(batch, "Throwable: " + throwableName + " x" + throwableCount, left, top - 200f);
+        font.draw(batch, "Selected: " + inventory.getSelectedSlot(), left, top - 25f);
+        font.draw(batch, "Slot: " + inventory.getSelectedSlot(), left, top - 50f);
+        font.draw(batch, "Primary: " + inventory.getPrimaryWeaponName() + " Ammo: " + inventory.getPrimaryAmmo(), left, top - 75f);
+        font.draw(batch, "Pistol: " + inventory.getPistolWeaponName() + " Ammo: " + inventory.getPistolAmmo(), left, top - 100f);
+        font.draw(batch, "Melee: " + inventory.getMeleeWeaponName(), left, top - 125f);
+        font.draw(batch, "Medkit: " + (inventory.hasMedkit() ? "1" : "0"), left, top - 150f);
+        font.draw(batch, "Boost: " + inventory.getBoostItemName(), left, top - 175f);
+        font.draw(batch, "Throwable: " + inventory.getThrowableName() + " x" + inventory.getThrowableCount(), left, top - 200f);
         font.draw(batch, "Kills: " + kills, left, top - 225f);
         font.draw(batch, "Map: " + (victory ? "Completed" : (levelIndex + 1) + "/4"), left, top - 250f);
 
@@ -1220,7 +892,8 @@ public class GameScreen extends ScreenAdapter {
         }
 
         font.draw(batch, "Wheel Switch | E Pickup | LMB Push | RMB Use", left, top - 300f);
-        if (selectedSlot == HandSlot.MEDKIT && hasMedkit && healUseTimer > 0f) {
+
+        if (inventory.getSelectedSlot() == HandSlot.MEDKIT && inventory.hasMedkit() && healUseTimer > 0f) {
             font.draw(batch, "Healing: " + (int) healUseTimer + " / " + (int) MEDKIT_USE_TIME, left, top - 325f);
         }
 
@@ -1243,38 +916,14 @@ public class GameScreen extends ScreenAdapter {
         }
     }
     private String getPrimaryWeaponName() {
-        if (primaryWeapon == null) {
-            return "None";
-        }
-
-        return primaryWeapon.getName();
+        return inventory.getPrimaryWeaponName();
     }
 
     private String getPistolWeaponName() {
-        if (pistolWeapon == null) {
-            return "None";
-        }
-
-        return pistolWeapon.getName();
+        return inventory.getPistolWeaponName();
     }
     private String getSelectedItemName() {
-        switch (selectedSlot) {
-            case PRIMARY:
-                return getPrimaryWeaponName();
-            case PISTOL:
-                return getPistolWeaponName();
-            case MELEE:
-                return meleeWeaponName;
-            case THROWABLE:
-                return throwableName;
-            case MEDKIT:
-                return hasMedkit ? "Medkit" : "None";
-            case BOOST:
-                return boostItemName;
-            case NONE:
-            default:
-                return "None";
-        }
+        return inventory.getSelectedItemName();
     }
     @Override
     public void dispose() {
