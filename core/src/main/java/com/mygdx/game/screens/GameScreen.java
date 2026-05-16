@@ -252,7 +252,7 @@ public class GameScreen extends ScreenAdapter {
         centerCameraOnPlayer();
     }
         private void handleMouseControls   (float delta) {
-            if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
                 pushZombies();
             }
 
@@ -297,7 +297,7 @@ public class GameScreen extends ScreenAdapter {
                 return;
             }
 
-            if (Gdx.input.isButtonPressed(Input.Buttons.RIGHT)
+            if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)
                 && shootTimer <= 0f
                 && inventory.getCurrentAmmo() >= currentWeapon.getAmmoPerShot()) {
 
@@ -351,7 +351,7 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private void handleMeleeAttack() {
-            if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+            if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
                 return;
             }
 
@@ -437,7 +437,7 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private void handleThrowableUse() {
-            if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+            if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
                 return;
             }
 
@@ -454,7 +454,7 @@ public class GameScreen extends ScreenAdapter {
                 return;
             }
 
-            if (!Gdx.input.isButtonPressed(Input.Buttons.RIGHT)) {
+            if (!Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
                 healUseTimer = 0f;
                 return;
             }
@@ -469,7 +469,7 @@ public class GameScreen extends ScreenAdapter {
         }
 
         private void handleBoostUse() {
-            if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+            if (!Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
                 return;
             }
 
