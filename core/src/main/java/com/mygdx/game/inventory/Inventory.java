@@ -2,8 +2,8 @@ package com.mygdx.game.inventory;
 
 import com.badlogic.gdx.utils.Array;
 import com.mygdx.game.entities.Weapon;
-import com.mygdx.game.items.PickupType;
 import com.mygdx.game.factories.WeaponFactory;
+import com.mygdx.game.items.PickupType;
 
 public class Inventory {
 

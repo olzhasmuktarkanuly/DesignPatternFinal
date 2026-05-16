@@ -14,21 +14,18 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.mygdx.game.core.Assets;
 import com.mygdx.game.core.MainGame;
-import com.mygdx.game.entities.AK47;
 import com.mygdx.game.entities.Bullet;
 import com.mygdx.game.entities.Enemy;
-import com.mygdx.game.entities.Pistol;
 import com.mygdx.game.entities.Player;
-import com.mygdx.game.entities.Sniper;
 import com.mygdx.game.entities.Weapon;
-import com.mygdx.game.world.LevelData;
-import com.mygdx.game.world.LevelManager;
-import com.mygdx.game.world.ZombieSpawner;
+import com.mygdx.game.inventory.HandSlot;
+import com.mygdx.game.inventory.Inventory;
 import com.mygdx.game.items.ItemFactory;
 import com.mygdx.game.items.Pickup;
 import com.mygdx.game.items.PickupType;
-import com.mygdx.game.inventory.HandSlot;
-import com.mygdx.game.inventory.Inventory;
+import com.mygdx.game.world.LevelData;
+import com.mygdx.game.world.LevelManager;
+import com.mygdx.game.world.ZombieSpawner;
 
 public class GameScreen extends ScreenAdapter {
 
@@ -914,16 +911,6 @@ public class GameScreen extends ScreenAdapter {
                 camera.position.y
             );
         }
-    }
-    private String getPrimaryWeaponName() {
-        return inventory.getPrimaryWeaponName();
-    }
-
-    private String getPistolWeaponName() {
-        return inventory.getPistolWeaponName();
-    }
-    private String getSelectedItemName() {
-        return inventory.getSelectedItemName();
     }
     @Override
     public void dispose() {
