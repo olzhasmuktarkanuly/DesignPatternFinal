@@ -27,6 +27,7 @@ import com.mygdx.game.world.ZombieSpawner;
 import com.mygdx.game.items.ItemFactory;
 import com.mygdx.game.items.Pickup;
 import com.mygdx.game.items.PickupType;
+import com.mygdx.game.inventory.HandSlot;
 
 public class GameScreen extends ScreenAdapter {
 
@@ -1280,14 +1281,5 @@ public class GameScreen extends ScreenAdapter {
         Gdx.input.setInputProcessor(null);
         batch.dispose();
         font.dispose();
-    }
-    private enum HandSlot {
-        NONE,
-        PRIMARY,
-        PISTOL,
-        MELEE,
-        THROWABLE,
-        MEDKIT,
-        BOOST
     }
 }
