@@ -3,12 +3,13 @@ package com.mygdx.game.world;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Array;
-import com.mygdx.game.enemies.*;
+import com.mygdx.game.factories.EnemyFactory;
 import com.mygdx.game.entities.Enemy;
 import com.mygdx.game.entities.Player;
 import com.mygdx.game.screens.GameScreen;
 
 public class ZombieSpawner {
+    private final EnemyFactory enemyFactory = new EnemyFactory();
     private float spawnTimer = 0f;
     private float spawnInterval = 2.0f;
     private int maxEnemies = 20;
@@ -33,31 +34,7 @@ public class ZombieSpawner {
 
     private Enemy createEnemy(int levelIndex, Player player, Array<Rectangle> walls, Rectangle exitZone) {
         Rectangle spawnRect = findSpawnPosition(player, walls, exitZone);
-
-        switch (levelIndex) {
-            case 0:
-                return new CommonZombie(spawnRect.x, spawnRect.y);
-            case 1:
-                return MathUtils.randomBoolean(0.75f)
-                    ? new CommonZombie(spawnRect.x, spawnRect.y)
-                    : new HunterZombie(spawnRect.x, spawnRect.y);
-            case 2: {
-                int roll = MathUtils.random(99);
-                if (roll < 50) return new CommonZombie(spawnRect.x, spawnRect.y);
-                if (roll < 75) return new HunterZombie(spawnRect.x, spawnRect.y);
-                if (roll < 90) return new BruteZombie(spawnRect.x, spawnRect.y);
-                return new SpitterZombie(spawnRect.x, spawnRect.y);
-            }
-            case 3:
-            default: {
-                int roll = MathUtils.random(99);
-                if (roll < 35) return new CommonZombie(spawnRect.x, spawnRect.y);
-                if (roll < 55) return new HunterZombie(spawnRect.x, spawnRect.y);
-                if (roll < 75) return new BruteZombie(spawnRect.x, spawnRect.y);
-                if (roll < 90) return new SpitterZombie(spawnRect.x, spawnRect.y);
-                return new ExploderZombie(spawnRect.x, spawnRect.y);
-            }
-        }
+        return enemyFactory.createEnemyForLevel(levelIndex, spawnRect.x, spawnRect.y);
     }
 
     private Rectangle findSpawnPosition(Player player, Array<Rectangle> walls, Rectangle exitZone) {
