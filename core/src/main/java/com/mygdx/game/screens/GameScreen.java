@@ -14,10 +14,7 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.mygdx.game.core.Assets;
 import com.mygdx.game.core.MainGame;
-import com.mygdx.game.entities.Bullet;
-import com.mygdx.game.entities.Enemy;
-import com.mygdx.game.entities.Player;
-import com.mygdx.game.entities.Weapon;
+import com.mygdx.game.entities.*;
 import com.mygdx.game.inventory.HandSlot;
 import com.mygdx.game.inventory.Inventory;
 import com.mygdx.game.items.ItemFactory;
@@ -61,6 +58,7 @@ public class GameScreen extends ScreenAdapter {
     private float healUseTimer = 0f;
     private float pushTimer = 0f;
     private float meleeTimer = 0f;
+    private float animationTime = 0f;
 
     private final Inventory inventory = new Inventory();
 
@@ -194,6 +192,7 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
+        animationTime += delta;
         update(delta);
 
         Gdx.gl.glClearColor(0.06f, 0.06f, 0.06f, 1f);
@@ -711,6 +710,18 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void drawSafeZones() {
+        float pulse = 0.65f + 0.25f * (float) Math.sin(animationTime * 3f);
+
+        batch.setColor(0.15f, 0.55f, 1f, 0.35f);
+        batch.draw(
+            Assets.safeZoneTexture,
+            startSafeZone.x - 8,
+            startSafeZone.y - 8,
+            startSafeZone.width + 16,
+            startSafeZone.height + 16
+        );
+
+        batch.setColor(0.1f, 0.35f, 1f, pulse);
         batch.draw(
             Assets.safeZoneTexture,
             startSafeZone.x,
@@ -720,6 +731,16 @@ public class GameScreen extends ScreenAdapter {
         );
 
         if (!victory) {
+            batch.setColor(0.1f, 0.7f, 1f, 0.35f);
+            batch.draw(
+                Assets.safeZoneTexture,
+                exitZone.x - 12,
+                exitZone.y - 12,
+                exitZone.width + 24,
+                exitZone.height + 24
+            );
+
+            batch.setColor(0.05f, 0.45f, 1f, pulse);
             batch.draw(
                 Assets.safeZoneTexture,
                 exitZone.x,
@@ -728,6 +749,8 @@ public class GameScreen extends ScreenAdapter {
                 exitZone.height
             );
         }
+
+        batch.setColor(Color.WHITE);
     }
 
     private void drawWalls() {
@@ -846,14 +869,31 @@ public class GameScreen extends ScreenAdapter {
     private void drawPlayer() {
         if (!player.isDead()) {
             Rectangle p = player.getBounds();
-            batch.draw(Assets.playerTexture, p.x, p.y, p.width, p.height);
+
+            float pulse = 1f + 0.03f * (float) Math.sin(animationTime * 8f);
+            float width = p.width * pulse;
+            float height = p.height * pulse;
+
+            float drawX = p.x - (width - p.width) / 2f;
+            float drawY = p.y - (height - p.height) / 2f;
+
+            batch.draw(Assets.playerTexture, drawX, drawY, width, height);
         }
     }
 
     private void drawEnemies() {
-        for (Enemy enemy : enemies) {
+        for (int i = 0; i < enemies.size; i++) {
+            Enemy enemy = enemies.get(i);
             Rectangle z = enemy.getBounds();
-            batch.draw(enemy.getTexture(), z.x, z.y, z.width, z.height);
+
+            float pulse = 1f + 0.06f * (float) Math.sin(animationTime * 6f + i);
+            float width = z.width * pulse;
+            float height = z.height * pulse;
+
+            float drawX = z.x - (width - z.width) / 2f;
+            float drawY = z.y - (height - z.height) / 2f;
+
+            batch.draw(enemy.getTexture(), drawX, drawY, width, height);
         }
     }
 
